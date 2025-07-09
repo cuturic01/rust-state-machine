@@ -35,17 +35,21 @@ impl<T: Config> Pallet<T>
 		*self.balances.get(who).unwrap_or(&T::Balance::zero())
 	}
 
-    /// Transfer `amount` from one account to another.
+}
+
+#[macros::call]
+impl<T: Config> Pallet<T> {
+	/// Transfer `amount` from one account to another.
 	/// This function verifies that `from` has at least `amount` balance to transfer,
 	/// and that no mathematical overflows occur.
 	pub fn transfer(
 		&mut self,
-		from: &T::AccountId,
-		to: &T::AccountId,
+		caller: T::AccountId,
+		to: T::AccountId,
 		amount: T::Balance,
 	) -> DispatchResult {
-		let from_balance = self.balance(from);
-		let to_balance = self.balance(to);
+		let from_balance = self.balance(&caller);
+		let to_balance = self.balance(&to);
 
 		let from_balance = from_balance
             .checked_sub(&amount)
@@ -55,36 +59,9 @@ impl<T: Config> Pallet<T>
             .checked_add(&amount)
             .ok_or("Owerflow occured.")?;
 
-		self.set_balance(from, from_balance);
-		self.set_balance(to, to_balance);
+		self.set_balance(&caller, from_balance);
+		self.set_balance(&to, to_balance);
 
-		Ok(())
-	}
-}
-
-// A public enum which describes the calls we want to expose to the dispatcher.
-// We should expect that the caller of each call will be provided by the dispatcher,
-// and not included as a parameter of the call.
-pub enum Call<T: Config> {
-	Transfer { to: T::AccountId, amount: T::Balance },
-}
-
-/// Implementation of the dispatch logic, mapping from `BalancesCall` to the appropriate underlying
-/// function we want to execute.
-impl<T: Config> crate::support::Dispatch for Pallet<T> {
-	type Caller = T::AccountId;
-	type Call = Call<T>;
-
-	fn dispatch(
-		&mut self,
-		caller: Self::Caller,
-		call: Self::Call,
-	) -> crate::support::DispatchResult {
-		match call {
-	        Call::Transfer { to, amount } => {
-		        self.transfer(&caller, &to, amount)?;
-            }
-        }
 		Ok(())
 	}
 }
@@ -120,8 +97,8 @@ mod tests {
 
         let result = balances
             .transfer(
-                &"alice".to_string(), 
-                &"bob".to_string(), 
+                "alice".to_string(), 
+                "bob".to_string(), 
                 50
         );
 
